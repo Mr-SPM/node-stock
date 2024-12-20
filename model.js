@@ -34,6 +34,7 @@ const BaseSchema = new mongoose.Schema({
 
 module.exports = {
     Stocks: mongoose.model('Stocks', stockSchema),
-    tempStocks: mongoose.model('tempStocks', stockSchema),
+    TempStocks: mongoose.model('tempStocks', stockSchema),
+    LastStocks: mongoose.model('lastStocks', stockSchema),
     BaseSchema: mongoose.model('stockList', BaseSchema),
 } 

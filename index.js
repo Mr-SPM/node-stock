@@ -14,7 +14,7 @@ const utils = require('./utils')
 
 const mongoose = require('mongoose');
 
-const { Stocks, tempStocks, BaseSchema } = require('./model')
+const { Stocks, TempStocks, BaseSchema, LastStocks } = require('./model')
 const cron = require('node-cron')
 const dayjs = require('dayjs')
 require('dotenv').config();  // 加载 .env 文件中的变量
@@ -43,15 +43,39 @@ const dbOptions = {
 mongoose.connect(uri, dbOptions).then(() => console.log('Connected to MongoDB'))
     .catch((error) => console.error('Error connecting to MongoDB:', error));
 
+const targetMap = {
+    temp: TempStocks,
+    history: Stocks,
+    last: LastStocks,
+}
 
-async function insert(list, isTemp = false) {
+const batchSize = 1000;
+
+async function batchInsert(target, list) {
+    for (let i = 0; i < list.length; i += batchSize) {
+        const batch = list.slice(i, i + batchSize);
+        await target.insertMany(batch);
+        console.log(`成功插入第 ${i / batchSize + 1} 批数据`);
+    }
+}
+
+/**
+ * list 数据源
+ * type temp 临时数据 history 历史数据 last 上一个交易日最新数据
+ */
+async function insert(list, type) {
     try {
-        const target = isTemp ? tempStocks : Stocks
-        if (isTemp) {
-            await tempStocks.deleteMany({})
+
+        const target = targetMap[type]
+        if (type !== 'history') {
+            await target.deleteMany({})
         }
-        const resList = await target.create(list)
-        console.log('inserted', isTemp, resList)
+        const resList = await batchInsert(target, list)
+        if (type === 'history') {
+            // 额外存一个缓存数据
+            await batchInsert(LastStocks, list)
+        }
+        console.log('inserted', type, resList)
         // while (list.length > 0) {
 
         //     const part = list.length > 500 ? list.splice(0, 100) : list.splice(0, list.length)
@@ -61,14 +85,13 @@ async function insert(list, isTemp = false) {
         //     console.log('insertedUsers', insertedUsers)
 
         // }
-
-        console.log('全部插入成功');
     } catch (err) {
         console.warn('批量插入数据失败', err)
     } finally {
         console.log('数据插入成功')
     }
 }
+
 
 app.get('/', async (req, res) => {
     res.send('Hello World!')
@@ -189,7 +212,7 @@ app.get('/sh', async (req, res) => {
 
         const list = await getStockList(data.sh)
 
-        await insert(list)
+        await insert(list, 'history')
 
         res.send('操作成功')
 
@@ -204,7 +227,7 @@ app.get('/sz', async (req, res) => {
         console.log('开始获取深市数据')
         const list = await getStockList(data.sz)
         console.log('抓取成功！')
-        await insert(list)
+        await insert(list, 'history')
         res.send('操作成功')
     } catch (e) {
         res.send(e)
@@ -224,14 +247,21 @@ async function getAllStockListOnline() {
 /**
  * 存储当日数据
  */
-async function insertToday(isTemp = false) {
-    const allList = getAllStockListOnline()
-    insert(allList, isTemp)
+async function insertToday(type) {
+    const allList = await getAllStockListOnline()
+    insert(allList, type)
 }
+
+
+app.get('/insertLast', async (req, res) => {
+    console.log('记录last数据')
+    await insertToday('last')
+    res.send('操作成功！')
+})
 
 app.get('/temp', async (req, res) => {
     console.log('记录temp数据')
-    await insertTodayTemp()
+    await insertToday('temp')
     res.send('操作成功！')
 })
 
@@ -242,55 +272,10 @@ app.get('/init', (req, res) => {
 
 })
 
-
-
-// 查询函数
-async function findAmountIncrease() {
-    try {
-        // 获取今天和昨天的日期
-        const today = dayjs().format('YYYY-MM-DD');
-        const yesterday = dayjs().subtract(1, 'days').format('YYYY-MM-DD');
-        // 查询今天和昨天相同name的记录
-        const stocksToday = await Stocks.find({ date: today });
-        const stocksYesterday = await Stocks.find({ date: yesterday });
-
-        const result = [];
-
-        // 对比今天和昨天的数据
-        stocksToday.forEach(todayStock => {
-            // 查找昨天相同name的股票数据
-            const yesterdayStock = stocksYesterday.find(yesterdayStock => yesterdayStock.name === todayStock.name);
-
-            if (yesterdayStock) {
-                // 计算amount的增长
-                const amountIncrease = (todayStock.amount - yesterdayStock.amount) / yesterdayStock.amount * 100;
-
-                // 如果amount增长超过9%，则记录该数据
-                if (amountIncrease > 9) {
-                    result.push({
-                        name: todayStock.name,
-                        todayAmount: todayStock.amount,
-                        yesterdayAmount: yesterdayStock.amount,
-                        amountIncrease: amountIncrease.toFixed(2) + '%',
-                        date: todayStock.date,
-                        time: todayStock.time
-                    });
-                }
-            }
-        });
-
-        console.log('Amount increase > 9%:', result);
-
-        return result;
-    } catch (error) {
-        console.error('Error fetching data:', error);
-    }
-}
-
 /** 查询temp列表数据 */
 async function queryTempStocks() {
     try {
-        const list = await tempStocks.find();
+        const list = await TempStocks.find();
         if (list.length === 0) {
             return res.status(404).send('No matching stocks found');
         }
@@ -305,8 +290,6 @@ async function queryTempStocks() {
 // 实时查询成交额是否超过昨日的9%
 async function findRealAmountIncrease(useDb = false) {
     try {
-
-        const yesterday = dayjs().subtract(1, 'days').format('YYYY-MM-DD');
         // 查询今天和昨天相同name的记录
         let stocksToday = []
         if (useDb) {
@@ -314,7 +297,7 @@ async function findRealAmountIncrease(useDb = false) {
         } else {
             stocksToday = await getAllStockListOnline();
         }
-        const stocksYesterday = await Stocks.find({ date: yesterday });
+        const stocksYesterday = await LastStocks.find();
 
         const result = [];
 
@@ -333,7 +316,7 @@ async function findRealAmountIncrease(useDb = false) {
                         name: todayStock.name,
                         todayAmount: todayStock.amount,
                         yesterdayAmount: yesterdayStock.amount,
-                        amountIncrease: amountIncrease.toFixed(2) + '%',
+                        amountIncrease: amountIncrease.toFixed(2),
                         date: todayStock.date,
                         time: todayStock.time
                     });
@@ -341,7 +324,7 @@ async function findRealAmountIncrease(useDb = false) {
             }
         });
 
-        console.log('Amount increase > 9%:', result);
+        console.log('Amount increase > 9%:', result.sort((a, b) => b.amountIncrease - a.amountIncrease));
         return result;
     } catch (error) {
         console.error('Error fetching data:', error);
@@ -479,7 +462,7 @@ async function isTradingDay() {
 cron.schedule('25 9 * * 1-5', async () => {
     if (await isTradingDay()) {
         console.log('今天是交易日，执行任务');
-        await insertToday(true)
+        await insertToday('temp')
         console.log('竞价数据已缓存！')
     } else {
         console.log('今天不是交易日');
@@ -493,7 +476,7 @@ cron.schedule('10 15 * * 1-5', async () => {
     if (await isTradingDay()) {
         console.log('今天是交易日，执行任务');
         // 存储今日交易信息
-        await insertToday()
+        await insertToday('history')
         console.log('收盘数据已缓存！')
     } else {
         console.log('今天不是交易日');
