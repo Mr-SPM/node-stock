@@ -26,4 +26,14 @@ const stockSchema = new mongoose.Schema({
 
 });
 
-module.exports = mongoose.model('Stocks', stockSchema);
+const BaseSchema = new mongoose.Schema({
+    name: String,
+    value: String,
+    type: String,
+})
+
+module.exports = {
+    Stocks: mongoose.model('Stocks', stockSchema),
+    tempStocks: mongoose.model('tempStocks', stockSchema),
+    BaseSchema: mongoose.model('stockList', BaseSchema),
+} 

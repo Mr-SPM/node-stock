@@ -14,8 +14,13 @@ const utils = require('./utils')
 
 const mongoose = require('mongoose');
 
-const Stocks = require('./model')
+const { Stocks, tempStocks, BaseSchema } = require('./model')
+const cron = require('node-cron')
 const dayjs = require('dayjs')
+require('dotenv').config();  // 加载 .env 文件中的变量
+
+
+const calValue = utils.calValue
 
 // 从环境变量中获取数据库连接信息
 const dbHost = process.env.DB_HOST;
@@ -27,7 +32,6 @@ const dbName = process.env.DB_NAME;
 // 构建数据库连接字符串
 const uri = `mongodb://${dbHost}:${dbPort}/${dbName}`;
 
-
 const dbOptions = {
     user: dbUser,
     pass: dbPassword,
@@ -35,83 +39,45 @@ const dbOptions = {
     connectTimeoutMS: 200000,
 }
 
-async function insert(list) {
 
+mongoose.connect(uri, dbOptions).then(() => console.log('Connected to MongoDB'))
+    .catch((error) => console.error('Error connecting to MongoDB:', error));
+
+
+async function insert(list, isTemp = false) {
     try {
-
-        // 连接到MongoDB服务器 
-
-        await mongoose.connect(uri, dbOptions)
-
-        console.log('连接成功');
-
-        try {
-
-            try {
-                const insertedUsers = await Stocks.create(list)
-                console.log('insertedUsers', insertedUsers)
-                // while (list.length > 0) {
-
-                //     const part = list.length > 500 ? list.splice(0, 100) : list.splice(0, list.length)
-
-                //     const insertedUsers = await Stocks.create(part)
-
-                //     console.log('insertedUsers', insertedUsers)
-
-                // }
-
-                console.log('全部插入成功');
-
-            } catch (err) {
-
-                console.warn('批量插入数据失败', err)
-
-            }
-
+        const target = isTemp ? tempStocks : Stocks
+        if (isTemp) {
+            await tempStocks.deleteMany({})
         }
+        const resList = await target.create(list)
+        console.log('inserted', isTemp, resList)
+        // while (list.length > 0) {
 
-        finally {
+        //     const part = list.length > 500 ? list.splice(0, 100) : list.splice(0, list.length)
 
-            console.log('finish')
+        //     const insertedUsers = await Stocks.create(part)
 
-        }
+        //     console.log('insertedUsers', insertedUsers)
 
+        // }
 
-
-    } catch (error) {
-
-        console.error(error);
-
+        console.log('全部插入成功');
+    } catch (err) {
+        console.warn('批量插入数据失败', err)
     } finally {
-
-        await mongoose.disconnect();
-
+        console.log('数据插入成功')
     }
-
 }
 
-
-
-
-const calValue = utils.calValue
-
 app.get('/', async (req, res) => {
-
-    await run()
-
     res.send('Hello World!')
-
 })
-
-
-
 
 async function getStockList(datas) {
     const stockList = datas.map(item => `${item.type.toLocaleLowerCase()}${item.value}`)
     const getList = async (part) => {
-
         const url = `https://hq.sinajs.cn/list=${part.join(',')}`;
-
         const resp = await axios.get(url, {
 
             // axios 乱码解决 
@@ -139,11 +105,8 @@ async function getStockList(datas) {
             },
 
         })
-
         const splitData = resp.data.split(';\n');
-
         const list = []
-
         for (let i = 0; i < splitData.length - 1; i++) {
 
             const code = splitData[i].split('="')[0].split('var hq_str_')[1];
@@ -199,11 +162,7 @@ async function getStockList(datas) {
             list.push(stockItem)
 
         }
-
-        console.log(list)
-
         return list
-
     }
 
     let resList = []
@@ -223,9 +182,6 @@ async function getStockList(datas) {
     return resList
 
 }
-
-
-
 
 app.get('/sh', async (req, res) => {
 
@@ -255,7 +211,29 @@ app.get('/sz', async (req, res) => {
     }
 })
 
+/**
+ * 获取所有股票线上数据
+ * @returns 
+ */
+async function getAllStockListOnline() {
+    const shList = await getStockList(data.sh)
+    const szList = await getStockList(data.sz)
+    return shList.concat(szList)
+}
 
+/**
+ * 存储当日数据
+ */
+async function insertToday(isTemp = false) {
+    const allList = getAllStockListOnline()
+    insert(allList, isTemp)
+}
+
+app.get('/temp', async (req, res) => {
+    console.log('记录temp数据')
+    await insertTodayTemp()
+    res.send('操作成功！')
+})
 
 
 app.get('/init', (req, res) => {
@@ -267,12 +245,8 @@ app.get('/init', (req, res) => {
 
 
 // 查询函数
-async function findVolumeIncrease() {
+async function findAmountIncrease() {
     try {
-        await mongoose.connect(uri, dbOptions)
-
-        console.log('连接成功');
-
         // 获取今天和昨天的日期
         const today = dayjs().format('YYYY-MM-DD');
         const yesterday = dayjs().subtract(1, 'days').format('YYYY-MM-DD');
@@ -288,16 +262,16 @@ async function findVolumeIncrease() {
             const yesterdayStock = stocksYesterday.find(yesterdayStock => yesterdayStock.name === todayStock.name);
 
             if (yesterdayStock) {
-                // 计算volume的增长
-                const volumeIncrease = (todayStock.volume - yesterdayStock.volume) / yesterdayStock.volume * 100;
+                // 计算amount的增长
+                const amountIncrease = (todayStock.amount - yesterdayStock.amount) / yesterdayStock.amount * 100;
 
-                // 如果volume增长超过9%，则记录该数据
-                if (volumeIncrease > 9) {
+                // 如果amount增长超过9%，则记录该数据
+                if (amountIncrease > 9) {
                     result.push({
                         name: todayStock.name,
-                        todayVolume: todayStock.volume,
-                        yesterdayVolume: yesterdayStock.volume,
-                        volumeIncrease: volumeIncrease.toFixed(2) + '%',
+                        todayAmount: todayStock.amount,
+                        yesterdayAmount: yesterdayStock.amount,
+                        amountIncrease: amountIncrease.toFixed(2) + '%',
                         date: todayStock.date,
                         time: todayStock.time
                     });
@@ -305,47 +279,138 @@ async function findVolumeIncrease() {
             }
         });
 
-        console.log('Volume increase > 9%:', result);
+        console.log('Amount increase > 9%:', result);
 
         return result;
     } catch (error) {
         console.error('Error fetching data:', error);
-    } finally {
-        mongoose.disconnect()
     }
 }
 
-app.get('/find', async (req, res) => {
-    const data = await findVolumeIncrease()
-    console.log(data, '查询完毕')
-    res.send(data)
-})
-
-
-// 构建获取股票基本信息的函数，参数stockCodes为股票代码数组
-async function getStockInfo(stockCodes) {
-    const baseUrl = 'http://stock.finance.sina.com.cn/stock/api/openapi.php/StockSearchService.search';
-    const params = {
-        keyword: stockCodes.join(',') // 将股票代码数组用逗号拼接为字符串作为参数
-    };
+/** 查询temp列表数据 */
+async function queryTempStocks() {
     try {
-        const response = await axios.get(baseUrl, {
-            params, headers: {
-                ...utils.randHeader(),
-                Referer: 'http://finance.sina.com.cn/',
+        const list = await tempStocks.find();
+        if (list.length === 0) {
+            return res.status(404).send('No matching stocks found');
+        }
+        // 返回查询到的结果
+        return list;
+    } catch (error) {
+        console.error('Error occurred while fetching stock data:', error);
+        return res.status(500).send('Internal server error');
+    }
+}
+
+// 实时查询成交额是否超过昨日的9%
+async function findRealAmountIncrease(useDb = false) {
+    try {
+
+        const yesterday = dayjs().subtract(1, 'days').format('YYYY-MM-DD');
+        // 查询今天和昨天相同name的记录
+        let stocksToday = []
+        if (useDb) {
+            stocksToday = await queryTempStocks()
+        } else {
+            stocksToday = await getAllStockListOnline();
+        }
+        const stocksYesterday = await Stocks.find({ date: yesterday });
+
+        const result = [];
+
+        // 对比今天和昨天的数据
+        stocksToday.forEach(todayStock => {
+            // 查找昨天相同name的股票数据
+            const yesterdayStock = stocksYesterday.find(yesterdayStock => yesterdayStock.name === todayStock.name);
+
+            if (yesterdayStock) {
+                // 计算amount的增长
+                const amountIncrease = todayStock.amount / yesterdayStock.amount * 100;
+
+                // 如果amount增长超过9%，则记录该数据
+                if (amountIncrease > 9) {
+                    result.push({
+                        name: todayStock.name,
+                        todayAmount: todayStock.amount,
+                        yesterdayAmount: yesterdayStock.amount,
+                        amountIncrease: amountIncrease.toFixed(2) + '%',
+                        date: todayStock.date,
+                        time: todayStock.time
+                    });
+                }
             }
         });
-        return response.data;
+
+        console.log('Amount increase > 9%:', result);
+        return result;
     } catch (error) {
-        console.error('请求出错：', error);
-        return null;
+        console.error('Error fetching data:', error);
     }
 }
 
-app.get('/history', async (req, res) => {
-    const data = await getStockInfo(['sz002162'])
+
+
+
+app.get('/list', async (req, res) => {
+    const { isOnline } = req.query;
+    const data = await findRealAmountIncrease(isOnline === '0')
     console.log(data, '查询完毕')
-    res.send(data)
+    res.json(data)
+})
+
+// 定义 /getInfo 路由
+app.get('/getInfo', async (req, res) => {
+    const { code } = req.query; // 获取查询参数 `code`
+
+    if (!code) {
+        return res.status(400).send('Code is required');
+    }
+
+    try {
+        // 使用正则进行模糊查询
+        const regex = new RegExp(code, 'i'); // 'i' 表示忽略大小写
+        const stocks = await Stocks.find({ code: { $regex: regex } }).sort({ date: -1 });;
+
+        if (stocks.length === 0) {
+            return res.status(404).send('No matching stocks found');
+        }
+
+        // 返回查询到的结果
+        return res.json(stocks);
+    } catch (error) {
+        console.error('Error occurred while fetching stock data:', error);
+        return res.status(500).send('Internal server error');
+    }
+});
+
+
+app.get('/getStockList', async (req, res) => {
+    try {
+        const list = await BaseSchema.find();
+        if (list.length === 0) {
+            return res.status(404).send('No matching stocks found');
+        }
+        // 返回查询到的结果
+        return res.json(list);
+    } catch (error) {
+        console.error('Error occurred while fetching stock data:', error);
+        return res.status(500).send('Internal server error');
+    }
+})
+
+app.get('/initStockList', async (req, res) => {
+    const batchSize = 1000; // 设置每批插入1000条数据
+    const _data = data.allData.map(item => ({
+        name: item.name,
+        value: `${item.type.toLocaleLowerCase()}${item.value}`,
+        type: item.type
+    }))
+    for (let i = 0; i < _data.length; i += batchSize) {
+        const batch = _data.slice(i, i + batchSize);
+        await BaseSchema.insertMany(batch);
+        console.log(`成功插入第 ${i / batchSize + 1} 批数据`);
+    }
+    res.send('操作完毕')
 })
 
 app.listen(port, () => {
@@ -356,3 +421,84 @@ app.listen(port, () => {
 
 
 
+process.on('SIGINT', async () => {
+    await mongoose.connection.close();
+    console.log('MongoDB connection closed');
+    process.exit(0);
+});
+
+
+// #region 定时任务存储数据
+
+// 判断是否是工作日（周一到周五）
+function isWeekday() {
+    const dayOfWeek = dayjs().day(); // 0: 周日, 1: 周一, ..., 6: 周六
+    return dayOfWeek >= 1 && dayOfWeek <= 5; // 判断是否是工作日
+}
+
+// 请求新浪财经的股票数据
+async function checkIfTradingDay(stockCode) {
+    try {
+        // 新浪财经的 URL
+        const url = `https://hq.sinajs.cn/list=${stockCode}`;
+
+        // 发送 GET 请求
+        const response = await axios.get(url);
+
+        // 从响应数据中提取股票数据
+        const data = response.data;
+
+        // 判断是否包含 "今日休市" 或类似的休市信息
+        if (data.includes("今日休市") || data.includes("停牌")) {
+            console.log('今天是休市日');
+            return false; // 今天不是交易日
+        }
+
+        console.log('今天是交易日');
+        return true; // 今天是交易日
+
+    } catch (error) {
+        console.error('请求新浪财经接口失败:', error);
+        return false; // 请求失败，认为不是交易日
+    }
+}
+
+// 检查今天是否是 A 股的交易日
+async function isTradingDay() {
+    if (!isWeekday()) {
+        console.log('今天是周末，不是交易日');
+        return false;
+    }
+
+    // 检查是否是工作日，并通过新浪财经获取某只股票的数据来验证
+    const stockCode = 'sh600519'; // 可以替换成任意的股票代码
+    const result = await checkIfTradingDay(stockCode);
+    return result;
+}
+
+cron.schedule('25 9 * * 1-5', async () => {
+    if (await isTradingDay()) {
+        console.log('今天是交易日，执行任务');
+        await insertToday(true)
+        console.log('竞价数据已缓存！')
+    } else {
+        console.log('今天不是交易日');
+    }
+}, {
+    timezone: 'Asia/Shanghai',  // 设置时区为上海时间
+});
+
+// 定时任务：每天 15:30 执行任务
+cron.schedule('10 15 * * 1-5', async () => {
+    if (await isTradingDay()) {
+        console.log('今天是交易日，执行任务');
+        // 存储今日交易信息
+        await insertToday()
+        console.log('收盘数据已缓存！')
+    } else {
+        console.log('今天不是交易日');
+    }
+}, {
+    timezone: 'Asia/Shanghai',  // 设置时区为上海时间
+});
+// #endregion 
