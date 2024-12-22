@@ -1,3 +1,6 @@
+require('dotenv').config();  // 加载 .env 文件中的变量
+const mongoose = require('mongoose');
+
 const calcFixedPriceNumber = (
 
     open,
@@ -45,9 +48,6 @@ const calcFixedPriceNumber = (
     return max;
 
 };
-
-
-
 
 const randHeader = () => {
 
@@ -123,9 +123,6 @@ const randHeader = () => {
 
 };
 
-
-
-
 const formatNumber = (val = 0, fixed = 2, format = true) => {
 
     const num = +val;
@@ -153,19 +150,43 @@ const calValue = (val = 0, fixed = 2, format = true) => {
     return format ? Number((num / 10000).toFixed(fixed)) : Number(num.toFixed(2))
 };
 
+// 从环境变量中获取数据库连接信息
+const dbHost = process.env.DB_HOST;
+const dbPort = process.env.DB_PORT;
+const dbUser = process.env.DB_USER;
+const dbPassword = process.env.DB_PASSWORD;
+const dbName = process.env.DB_NAME;
+
+
+const initDB = async () => {
+    // 构建数据库连接字符串
+    const uri = `mongodb://${dbHost}:${dbPort}/${dbName}`;
+
+    const dbOptions = {
+        user: dbUser,
+        pass: dbPassword,
+        dbName: dbName,
+        connectTimeoutMS: 200000,
+    }
+    try {
+        await mongoose.connect(uri, dbOptions)
+        console.log('Connected to MongoDB')
+        return true
+    } catch (err) {
+        return false
+    }
+}
+
 
 
 
 
 module.exports = {
-
     calcFixedPriceNumber,
-
     randHeader,
-
     formatNumber,
-    calValue
-
+    calValue,
+    initDB
 }
 
 
