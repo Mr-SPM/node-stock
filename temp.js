@@ -5,6 +5,11 @@ const a = require('iconv-lite');
 const data = require('./data')
 const batchSize = 1000;
 const utils = require('./utils')
+const targetMap = {
+    temp: TempStocks,
+    history: Stocks,
+    last: LastStocks,
+}
 
 
 const calValue = utils.calValue
