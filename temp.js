@@ -216,5 +216,6 @@ async function insertToday() {
     } finally {
         mongoose.connection.close();
     }
+}
 
 insertToday()
