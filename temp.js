@@ -208,7 +208,7 @@ async function insertToday() {
         await utils.initDB()
         if(await isTradingDay()) {
         const allList = await getAllStockListOnline()
-        insert(allList, 'temp')
+        await insert(allList, 'temp')
         console.log('记录临时日志成功')
         }else {
           console.warn('非交易日,不执行任务')
