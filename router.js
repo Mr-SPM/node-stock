@@ -249,6 +249,12 @@ router.get('/sz', async (req, res) => {
     }
 })
 
+router.get('/history', async (req, res) => {
+    console.log('记录history数据')
+    await insertToday('history')
+    res.send('操作成功！')
+})
+
 router.get('/insertLast', async (req, res) => {
     console.log('记录last数据')
     await insertToday('last')
