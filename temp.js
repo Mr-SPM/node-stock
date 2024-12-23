@@ -5,6 +5,7 @@ const a = require('iconv-lite');
 const data = require('./data')
 const batchSize = 1000;
 const utils = require('./utils')
+const mongoose = require('mongoose');
 const targetMap = {
     temp: TempStocks,
     history: Stocks,
@@ -203,13 +204,17 @@ async function isTradingDay() {
 }
 
 async function insertToday() {
-    if(await isTradingDay()) {
-    const allList = await getAllStockListOnline()
-    insert(allList, 'temp')
-    console.log('记录临时日志成功')
-    }else {
-      console.warn('非交易日,不执行任务')
-}
-}
+    try {
+        await utils.initDB()
+        if(await isTradingDay()) {
+        const allList = await getAllStockListOnline()
+        insert(allList, 'temp')
+        console.log('记录临时日志成功')
+        }else {
+          console.warn('非交易日,不执行任务')
+        }
+    } finally {
+        mongoose.connection.close();
+    }
 
 insertToday()
