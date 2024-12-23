@@ -1,7 +1,10 @@
 const { default: axios } = require('axios')
 const { Stocks, TempStocks, BaseSchema, LastStocks } = require('./model')
+const dayjs = require('dayjs')
+
 const batchSize = 1000;
 const utils = require('./utils')
+
 
 const calValue = utils.calValue
 async function batchInsert(target, list) {
