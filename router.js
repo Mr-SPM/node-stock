@@ -332,6 +332,7 @@ router.get('/initStockList', async (req, res) => {
 // #endregion
 
 // #region 定时任务存储数据
+/*
 
 // 判断是否是工作日（周一到周五）
 function isWeekday() {
@@ -405,5 +406,6 @@ cron.schedule('10 15 * * 1-5', async () => {
     timezone: 'Asia/Shanghai',  // 设置时区为上海时间
 });
 // #endregion 
+*/
 
 module.exports = router;
