@@ -1,6 +1,7 @@
 const { default: axios } = require('axios')
 const { Stocks, TempStocks, BaseSchema, LastStocks } = require('./model')
 const dayjs = require('dayjs')
+const a = require('iconv-lite');
 
 const batchSize = 1000;
 const utils = require('./utils')
