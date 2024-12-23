@@ -149,7 +149,21 @@ async function checkIfTradingDay(stockCode) {
         const url = `https://hq.sinajs.cn/list=${stockCode}`;
 
         // 发送 GET 请求
-        const response = await axios.get(url);
+        const response = await axios.get(url, {
+             // axios 乱码解决 
+            responseType: 'arraybuffer',
+            transformResponse: [
+                (data) => {
+                    const body = a.decode(data, 'GB18030');
+                    return body;
+                }
+            ],
+
+            headers: {
+                ...utils.randHeader(),
+                Referer: 'http://finance.sina.com.cn/',
+            }
+        });
 
         // 从响应数据中提取股票数据
         const data = response.data;
