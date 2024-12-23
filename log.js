@@ -187,6 +187,7 @@ async function insertToday() {
     }else {
       console.warn('非交易日,不执行任务')
 }
+}
 
 insertToday()
 
