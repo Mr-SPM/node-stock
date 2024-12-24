@@ -1,5 +1,5 @@
-import { Button, Card, Row, Space, Spin, Table } from 'antd'
-import { getList } from '@/api';
+import { Button, Card, message, Row, Space, Spin, Statistic, Table, Tag } from 'antd'
+import { getList, goLog } from '@/api';
 import { useState } from 'react';
 import { ColumnType } from 'antd/es/table';
 export default function HomePage() {
@@ -10,19 +10,21 @@ export default function HomePage() {
         title: '股票',
         dataIndex: 'name',
     }, {
-        title: '成交额',
+        title: '成交额（亿）',
         dataIndex: 'todayAmount',
+        align: 'right',
         render: (t) => <span style={{ color: 'red' }}>{t}</span>
     }, {
-        title: '昨日成交额',
+        title: '昨日成交额（亿）',
+        align: 'right',
         dataIndex: 'yesterdayAmount',
     }, {
         title: '涨幅',
         dataIndex: 'amountIncrease',
         render: (t) => <span style={{ color: 'red' }}>{t}</span>
     }, {
-        title: '日期',
-        dataIndex: 'date'
+        title: '记录时间',
+        dataIndex: 'time'
     }]
 
     const onGetList = async (isOnline = 0 as any) => {
@@ -35,14 +37,26 @@ export default function HomePage() {
             setLoading(false)
         }
     }
+
+    const onLog = async () => {
+        try {
+            const res = await goLog()
+            message.success('操作成功')
+        } catch (e) {
+            message.error('记录日志失败')
+        }
+    }
+
     return (
-        <Card title="量化实时" style={{ width: 880 }}>
-            <Row gutter={16} style={{ marginBottom: 16 }}>
-                <Space>
+        <Card title="量化实时" style={{ width: 880 }} extra={<Statistic title="交易日" value={info[0]?.date} />}>
+            <div style={{ marginBottom: 16 }}>
+                <Space align='center' style={{ width: '100%' }}>
+
                     <Button type='primary' onClick={() => onGetList()} style={{ width: '100%' }}>日志查询</Button>
                     <Button type='primary' onClick={() => onGetList(1)} style={{ width: '100%' }}>实时查询</Button>
+                    <Button type='primary' onClick={onLog} style={{ width: '100%' }}>记录日志</Button>
                 </Space>
-            </Row>
+            </div>
             <Spin spinning={loading}>
                 <Table columns={items} dataSource={info} />
             </Spin>

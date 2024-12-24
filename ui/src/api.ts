@@ -15,3 +15,7 @@ export function getList(params: { isOnline: 0 | 1 }) {
 export function getStockList() {
     return request.get('/getStockList')
 }
+
+export function goLog() {
+    return request.get('/temp')
+}

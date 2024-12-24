@@ -199,8 +199,8 @@ async function findRealAmountIncrease(useDb = false) {
                 if (amountIncrease > 9) {
                     result.push({
                         name: todayStock.name,
-                        todayAmount: todayStock.amount,
-                        yesterdayAmount: yesterdayStock.amount,
+                        todayAmount: (todayStock.amount/10000).toFixed(2),
+                        yesterdayAmount: (yesterdayStock.amount/10000).toFixed(2),
                         amountIncrease: amountIncrease.toFixed(2),
                         date: todayStock.date,
                         time: todayStock.time
