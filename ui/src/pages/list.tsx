@@ -13,6 +13,8 @@ export default function HomePage() {
         title: '成交额（亿）',
         dataIndex: 'todayAmount',
         align: 'right',
+        sorter: (a, b) => a.todayAmount - b.todayAmount,
+        defaultSortOrder: 'descend',
         render: (t) => <span style={{ color: 'red' }}>{t}</span>
     }, {
         title: '昨日成交额（亿）',
@@ -21,6 +23,7 @@ export default function HomePage() {
     }, {
         title: '涨幅',
         dataIndex: 'amountIncrease',
+        sorter: (a, b) => a.amountIncrease - b.amountIncrease,
         render: (t) => <span style={{ color: 'red' }}>{t}</span>
     }, {
         title: '记录时间',
@@ -58,7 +61,7 @@ export default function HomePage() {
                 </Space>
             </div>
             <Spin spinning={loading}>
-                <Table columns={items} dataSource={info} />
+                <Table columns={items} dataSource={info} pagination={false} />
             </Spin>
         </Card>
     );

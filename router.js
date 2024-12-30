@@ -188,6 +188,10 @@ async function findRealAmountIncrease(useDb = false) {
 
         // 对比今天和昨天的数据
         stocksToday.forEach(todayStock => {
+            // 排除ST
+            if (todayStock.name.startsWith('ST') || todayStock.name.startsWith('*')) {
+                return  
+            }
             // 查找昨天相同name的股票数据
             const yesterdayStock = stocksYesterday.find(yesterdayStock => yesterdayStock.name === todayStock.name);
 
@@ -201,7 +205,7 @@ async function findRealAmountIncrease(useDb = false) {
                         name: todayStock.name,
                         todayAmount: (todayStock.amount/10000).toFixed(2),
                         yesterdayAmount: (yesterdayStock.amount/10000).toFixed(2),
-                        amountIncrease: amountIncrease.toFixed(2),
+                        amountIncrease: ((todayStock.price - todayStock.yestclose)/todayStock.yestclose*100).toFixed(2),
                         date: todayStock.date,
                         time: todayStock.time
                     });
@@ -209,7 +213,7 @@ async function findRealAmountIncrease(useDb = false) {
             }
         });
 
-        console.log('Amount increase > 9%:', result.sort((a, b) => b.amountIncrease - a.amountIncrease));
+        console.log('Amount increase > 9%:', result);
         return result;
     } catch (error) {
         console.error('Error fetching data:', error);
