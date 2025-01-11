@@ -2,7 +2,7 @@ const express = require('express')
 
 const app = express()
 
-const port = 3002
+const port = process.env.DB_HOST || 3000
 
 const mongoose = require('mongoose');
 
