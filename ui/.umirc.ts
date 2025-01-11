@@ -9,7 +9,7 @@ export default defineConfig({
   npmClient: 'pnpm',
   proxy: {
     '/api': {
-      target: 'http://localhost:3002',
+      target: 'http://localhost:25250',
       'changeOrigin': true,
     }
   }

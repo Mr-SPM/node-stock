@@ -1,8 +1,8 @@
 const express = require('express')
-
+require('dotenv').config();  // 加载 .env 文件中的变量
 const app = express()
 
-const port = process.env.DB_HOST || 3000
+const port = process.env.WEB_PORT || 3000
 
 const mongoose = require('mongoose');
 
