@@ -42,11 +42,6 @@ export default function HomePage() {
     dataIndex: 'date'
   }]
 
-  const onGetList = async () => {
-    const res = await getList()
-    console.log(res)
-    setInfo(res.data)
-  }
 
   const [list, setList] = useState<any[]>(JSON.parse(localStorage.getItem('list') || '[]'))
   useEffect(() => {
@@ -68,7 +63,6 @@ export default function HomePage() {
         </Col>
         <Col span={8}>
           <Button type='primary' onClick={onGetInfo} disabled={!code} style={{ width: '100%' }}>查询</Button>
-          {/* <Button type='primary' onClick={onGetList} disabled={!!code} style={{ width: '50%' }}>列表</Button> */}
         </Col>
       </Row>
       <Spin  spinning={loading}>

@@ -1,4 +1,4 @@
-import { Button, Card, message, Row, Space, Spin, Statistic, Table, Tag } from 'antd'
+import { Button, Card, message, Space, Spin, Statistic, Table } from 'antd'
 import { getList, goLog } from '@/api';
 import { useState } from 'react';
 import { ColumnType } from 'antd/es/table';
@@ -9,25 +9,29 @@ export default function HomePage() {
     const items: ColumnType[] = [{
         title: '股票',
         dataIndex: 'name',
+        width: 100,
     }, {
         title: '成交额（亿）',
         dataIndex: 'todayAmount',
         align: 'right',
         sorter: (a, b) => a.todayAmount - b.todayAmount,
         defaultSortOrder: 'descend',
-        render: (t) => <span style={{ color: 'red' }}>{t}</span>
+        render: (t) => <span style={{ color: 'red' }}>{t}</span>,
+        width: 100,
     }, {
         title: '昨日成交额（亿）',
         align: 'right',
         dataIndex: 'yesterdayAmount',
+        width: 100,
     }, {
         title: '涨幅',
         dataIndex: 'amountIncrease',
         sorter: (a, b) => a.amountIncrease - b.amountIncrease,
-        render: (t) => <span style={{ color: 'red' }}>{t}</span>
+        render: (t) => <span style={{ color: 'red' }}>{t}</span>,
+        width: 80,
     }, {
         title: '记录时间',
-        dataIndex: 'time'
+        dataIndex: 'time',
     }]
 
     const onGetList = async (isOnline = 0 as any) => {
@@ -51,7 +55,7 @@ export default function HomePage() {
     }
 
     return (
-        <Card title="量化实时" style={{ width: 880 }} extra={<Statistic title="交易日" value={info[0]?.date} />}>
+        <Card style={{width: '100%'}} title="量化实时" extra={<Statistic title="交易日" value={info[0]?.date} />}>
             <div style={{ marginBottom: 16 }}>
                 <Space align='center' style={{ width: '100%' }}>
 
@@ -61,7 +65,7 @@ export default function HomePage() {
                 </Space>
             </div>
             <Spin spinning={loading}>
-                <Table columns={items} dataSource={info} pagination={false} />
+                <Table columns={items} dataSource={info} pagination={{ defaultPageSize: 20 }} scroll={{x: true, y: 500}}/>
             </Spin>
         </Card>
     );
