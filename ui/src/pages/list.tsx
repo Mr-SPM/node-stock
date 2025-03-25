@@ -1,5 +1,5 @@
 import { Button, Card, message, Space, Spin, Statistic, Table } from 'antd'
-import { getList, goLog } from '@/api';
+import { getTempList, goLog } from '@/api';
 import { useState } from 'react';
 import { ColumnType } from 'antd/es/table';
 export default function HomePage() {
@@ -37,7 +37,7 @@ export default function HomePage() {
     const onGetList = async (isOnline = 0 as any) => {
         setLoading(true)
         try {
-            const res = await getList({ isOnline })
+            const res = await getTempList({ isOnline })
             console.log(res)
             setInfo(res.data)
         } finally {
