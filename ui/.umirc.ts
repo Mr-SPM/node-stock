@@ -11,6 +11,8 @@ export default defineConfig({
       target: 'http://localhost:25250',
       'changeOrigin': true,
     }
+  },
+  define: {
+    API_LIST: process.env.API_LIST
   }
-
 });
